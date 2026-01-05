@@ -97,30 +97,50 @@ function saveToLocalStorage() {
             // Vérifier que la sauvegarde a bien fonctionné
             const verification = localStorage.getItem(STORAGE_KEY);
             if (!verification || verification !== dataToSave) {
-                console.warn('Attention: La sauvegarde dans localStorage pourrait avoir échoué');
+                console.error('[DataManager] ERREUR: La sauvegarde dans localStorage a échoué!');
+                return false;
+            } else {
+                console.log('[DataManager] Données sauvegardées avec succès dans localStorage');
+                return true;
             }
         } else {
-            console.warn('localStorage n\'est pas disponible dans ce navigateur');
+            console.error('[DataManager] ERREUR: localStorage n\'est pas disponible dans ce navigateur');
+            return false;
         }
     } catch (error) {
-        console.error('Erreur lors de la sauvegarde dans localStorage:', error);
+        console.error('[DataManager] ERREUR lors de la sauvegarde dans localStorage:', error);
         // Si le localStorage est plein, essayer de nettoyer ou avertir l'utilisateur
         if (error.name === 'QuotaExceededError') {
-            console.error('Le localStorage est plein. Impossible de sauvegarder les données.');
+            console.error('[DataManager] Le localStorage est plein. Impossible de sauvegarder les données.');
             alert('Attention: Le stockage local est plein. Les données ne peuvent pas être sauvegardées.');
         }
+        return false;
     }
 }
 
 // Fonction pour charger depuis localStorage
 function loadFromLocalStorage() {
     try {
-        const saved = localStorage.getItem(STORAGE_KEY);
-        if (saved) {
-            return JSON.parse(saved);
+        if (typeof Storage !== 'undefined' && localStorage) {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                console.log('[DataManager] Données chargées depuis localStorage:', {
+                    voitures: parsed.voitures ? parsed.voitures.length : 0,
+                    clients: parsed.clients ? parsed.clients.length : 0,
+                    reservations: parsed.reservations ? parsed.reservations.length : 0,
+                    factures: parsed.factures ? parsed.factures.length : 0,
+                    utilisateurs: parsed.utilisateurs ? parsed.utilisateurs.length : 0
+                });
+                return parsed;
+            } else {
+                console.log('[DataManager] Aucune donnée trouvée dans localStorage');
+            }
+        } else {
+            console.error('[DataManager] localStorage n\'est pas disponible');
         }
     } catch (error) {
-        console.error('Erreur lors du chargement depuis localStorage:', error);
+        console.error('[DataManager] Erreur lors du chargement depuis localStorage:', error);
     }
     return null;
 }
@@ -129,15 +149,25 @@ function loadFromLocalStorage() {
 let dataStore = loadFromLocalStorage();
 if (!dataStore) {
     // Si aucune donnée sauvegardée, utiliser les données par défaut
+    console.log('[DataManager] Aucune donnée sauvegardée trouvée. Utilisation des données par défaut.');
     dataStore = JSON.parse(JSON.stringify(defaultDataStore));
     saveToLocalStorage(); // Sauvegarder les données par défaut
+    console.log('[DataManager] Données par défaut sauvegardées.');
 } else {
     // S'assurer que toutes les propriétés existent (au cas où la structure change)
+    console.log('[DataManager] Données chargées depuis localStorage.');
     if (!dataStore.voitures) dataStore.voitures = [];
     if (!dataStore.clients) dataStore.clients = [];
     if (!dataStore.reservations) dataStore.reservations = [];
     if (!dataStore.factures) dataStore.factures = [];
     if (!dataStore.utilisateurs) dataStore.utilisateurs = [];
+    console.log('[DataManager] État des données:', {
+        voitures: dataStore.voitures.length,
+        clients: dataStore.clients.length,
+        reservations: dataStore.reservations.length,
+        factures: dataStore.factures.length,
+        utilisateurs: dataStore.utilisateurs.length
+    });
 }
 
 // Objet dataManager avec persistance automatique
@@ -158,7 +188,9 @@ const dataManager = {
         const newItem = { ...item, id: newId };
         data.push(newItem);
         // Sauvegarder immédiatement après création
+        console.log(`[DataManager] Création d'un nouvel élément de type "${type}" avec ID ${newId}`);
         saveToLocalStorage();
+        console.log(`[DataManager] Données sauvegardées. Total ${type}:`, data.length);
         return newItem;
     },
     update(type, id, updatedItem) {
