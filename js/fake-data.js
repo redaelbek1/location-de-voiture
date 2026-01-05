@@ -151,11 +151,15 @@ if (!dataStore) {
     // Si aucune donnée sauvegardée, utiliser les données par défaut
     console.log('[DataManager] Aucune donnée sauvegardée trouvée. Utilisation des données par défaut.');
     dataStore = JSON.parse(JSON.stringify(defaultDataStore));
-    saveToLocalStorage(); // Sauvegarder les données par défaut
-    console.log('[DataManager] Données par défaut sauvegardées.');
+    const saved = saveToLocalStorage(); // Sauvegarder les données par défaut
+    if (saved) {
+        console.log('[DataManager] ✓ Données par défaut sauvegardées avec succès.');
+    } else {
+        console.error('[DataManager] ✗ ÉCHEC de la sauvegarde des données par défaut!');
+    }
 } else {
     // S'assurer que toutes les propriétés existent (au cas où la structure change)
-    console.log('[DataManager] Données chargées depuis localStorage.');
+    console.log('[DataManager] ✓ Données chargées depuis localStorage.');
     if (!dataStore.voitures) dataStore.voitures = [];
     if (!dataStore.clients) dataStore.clients = [];
     if (!dataStore.reservations) dataStore.reservations = [];
@@ -168,6 +172,12 @@ if (!dataStore) {
         factures: dataStore.factures.length,
         utilisateurs: dataStore.utilisateurs.length
     });
+}
+
+// Vérifier que dataStore est bien défini et accessible
+if (!dataStore) {
+    console.error('[DataManager] ERREUR CRITIQUE: dataStore n\'est pas défini!');
+    dataStore = JSON.parse(JSON.stringify(defaultDataStore));
 }
 
 // Objet dataManager avec persistance automatique
@@ -183,14 +193,29 @@ const dataManager = {
         return data.find(item => item.id === id) || null;
     },
     create(type, item) {
+        if (!dataStore) {
+            console.error('[DataManager] ERREUR: dataStore n\'est pas défini!');
+            return null;
+        }
         const data = this.getAll(type);
         const newId = data.length > 0 ? Math.max(...data.map(i => i.id)) + 1 : 1;
         const newItem = { ...item, id: newId };
         data.push(newItem);
         // Sauvegarder immédiatement après création
         console.log(`[DataManager] Création d'un nouvel élément de type "${type}" avec ID ${newId}`);
-        saveToLocalStorage();
-        console.log(`[DataManager] Données sauvegardées. Total ${type}:`, data.length);
+        console.log(`[DataManager] Avant sauvegarde - Total ${type}:`, dataStore[type].length);
+        const saved = saveToLocalStorage();
+        if (saved) {
+            console.log(`[DataManager] ✓ Données sauvegardées avec succès. Total ${type}:`, dataStore[type].length);
+            // Vérifier que les données sont bien dans localStorage
+            const check = localStorage.getItem(STORAGE_KEY);
+            if (check) {
+                const parsed = JSON.parse(check);
+                console.log(`[DataManager] Vérification localStorage - Total ${type}:`, parsed[type] ? parsed[type].length : 0);
+            }
+        } else {
+            console.error(`[DataManager] ✗ ÉCHEC de la sauvegarde pour ${type}!`);
+        }
         return newItem;
     },
     update(type, id, updatedItem) {
@@ -198,8 +223,14 @@ const dataManager = {
         const index = data.findIndex(item => item.id === id);
         if (index !== -1) {
             data[index] = { ...data[index], ...updatedItem };
+            // S'assurer que dataStore est bien mis à jour
+            dataStore[type] = data;
             // Sauvegarder immédiatement après modification
-            saveToLocalStorage();
+            console.log(`[DataManager] Modification de l'élément ${id} de type "${type}"`);
+            const saved = saveToLocalStorage();
+            if (!saved) {
+                console.error(`[DataManager] ✗ ÉCHEC de la sauvegarde pour ${type}!`);
+            }
             return data[index];
         }
         return null;
@@ -209,8 +240,14 @@ const dataManager = {
         const index = data.findIndex(item => item.id === id);
         if (index !== -1) {
             data.splice(index, 1);
+            // S'assurer que dataStore est bien mis à jour
+            dataStore[type] = data;
             // Sauvegarder immédiatement après suppression
-            saveToLocalStorage();
+            console.log(`[DataManager] Suppression de l'élément ${id} de type "${type}"`);
+            const saved = saveToLocalStorage();
+            if (!saved) {
+                console.error(`[DataManager] ✗ ÉCHEC de la sauvegarde pour ${type}!`);
+            }
             return true;
         }
         return false;
