@@ -91,9 +91,24 @@ const STORAGE_KEY = 'location_voiture_data';
 // Fonction pour sauvegarder dans localStorage
 function saveToLocalStorage() {
     try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(dataStore));
+        if (typeof Storage !== 'undefined' && localStorage) {
+            const dataToSave = JSON.stringify(dataStore);
+            localStorage.setItem(STORAGE_KEY, dataToSave);
+            // Vérifier que la sauvegarde a bien fonctionné
+            const verification = localStorage.getItem(STORAGE_KEY);
+            if (!verification || verification !== dataToSave) {
+                console.warn('Attention: La sauvegarde dans localStorage pourrait avoir échoué');
+            }
+        } else {
+            console.warn('localStorage n\'est pas disponible dans ce navigateur');
+        }
     } catch (error) {
         console.error('Erreur lors de la sauvegarde dans localStorage:', error);
+        // Si le localStorage est plein, essayer de nettoyer ou avertir l'utilisateur
+        if (error.name === 'QuotaExceededError') {
+            console.error('Le localStorage est plein. Impossible de sauvegarder les données.');
+            alert('Attention: Le stockage local est plein. Les données ne peuvent pas être sauvegardées.');
+        }
     }
 }
 
@@ -116,12 +131,22 @@ if (!dataStore) {
     // Si aucune donnée sauvegardée, utiliser les données par défaut
     dataStore = JSON.parse(JSON.stringify(defaultDataStore));
     saveToLocalStorage(); // Sauvegarder les données par défaut
+} else {
+    // S'assurer que toutes les propriétés existent (au cas où la structure change)
+    if (!dataStore.voitures) dataStore.voitures = [];
+    if (!dataStore.clients) dataStore.clients = [];
+    if (!dataStore.reservations) dataStore.reservations = [];
+    if (!dataStore.factures) dataStore.factures = [];
+    if (!dataStore.utilisateurs) dataStore.utilisateurs = [];
 }
 
 // Objet dataManager avec persistance automatique
 const dataManager = {
     getAll(type) {
-        return dataStore[type] || [];
+        if (!dataStore[type]) {
+            dataStore[type] = [];
+        }
+        return dataStore[type];
     },
     getById(type, id) {
         const data = this.getAll(type);
@@ -132,7 +157,8 @@ const dataManager = {
         const newId = data.length > 0 ? Math.max(...data.map(i => i.id)) + 1 : 1;
         const newItem = { ...item, id: newId };
         data.push(newItem);
-        saveToLocalStorage(); // Sauvegarder après création
+        // Sauvegarder immédiatement après création
+        saveToLocalStorage();
         return newItem;
     },
     update(type, id, updatedItem) {
@@ -140,7 +166,8 @@ const dataManager = {
         const index = data.findIndex(item => item.id === id);
         if (index !== -1) {
             data[index] = { ...data[index], ...updatedItem };
-            saveToLocalStorage(); // Sauvegarder après modification
+            // Sauvegarder immédiatement après modification
+            saveToLocalStorage();
             return data[index];
         }
         return null;
@@ -150,14 +177,16 @@ const dataManager = {
         const index = data.findIndex(item => item.id === id);
         if (index !== -1) {
             data.splice(index, 1);
-            saveToLocalStorage(); // Sauvegarder après suppression
+            // Sauvegarder immédiatement après suppression
+            saveToLocalStorage();
             return true;
         }
         return false;
     },
     clearAll(type) {
         dataStore[type] = [];
-        saveToLocalStorage(); // Sauvegarder après nettoyage
+        // Sauvegarder immédiatement après nettoyage
+        saveToLocalStorage();
     },
     count(type) {
         return this.getAll(type).length;
