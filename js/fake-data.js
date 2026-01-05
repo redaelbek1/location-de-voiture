@@ -1,10 +1,11 @@
 /**
  * DONNÉES FAKE STATIQUES - Pour démonstration et tests
  * Pack de données pré-remplies pour tester le dashboard et les fonctionnalités
+ * Les données sont maintenant persistées dans localStorage
  */
 
-// Stockage des données en mémoire (tableaux simples)
-const dataStore = {
+// Données par défaut (fake data)
+const defaultDataStore = {
     voitures: [
         { id: 1, marque: 'Dacia', modele: 'Logan', prix: 250, statut: 'Disponible', annee: 2020, couleur: 'Blanc' },
         { id: 2, marque: 'Renault', modele: 'Clio', prix: 300, statut: 'En location', annee: 2019, couleur: 'Rouge' },
@@ -84,7 +85,40 @@ const dataStore = {
     ]
 };
 
-// Objet dataManager simple pour compatibilité avec les fichiers CRUD existants
+// Clé pour localStorage
+const STORAGE_KEY = 'location_voiture_data';
+
+// Fonction pour sauvegarder dans localStorage
+function saveToLocalStorage() {
+    try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(dataStore));
+    } catch (error) {
+        console.error('Erreur lors de la sauvegarde dans localStorage:', error);
+    }
+}
+
+// Fonction pour charger depuis localStorage
+function loadFromLocalStorage() {
+    try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+            return JSON.parse(saved);
+        }
+    } catch (error) {
+        console.error('Erreur lors du chargement depuis localStorage:', error);
+    }
+    return null;
+}
+
+// Initialiser dataStore avec les données sauvegardées ou les données par défaut
+let dataStore = loadFromLocalStorage();
+if (!dataStore) {
+    // Si aucune donnée sauvegardée, utiliser les données par défaut
+    dataStore = JSON.parse(JSON.stringify(defaultDataStore));
+    saveToLocalStorage(); // Sauvegarder les données par défaut
+}
+
+// Objet dataManager avec persistance automatique
 const dataManager = {
     getAll(type) {
         return dataStore[type] || [];
@@ -98,6 +132,7 @@ const dataManager = {
         const newId = data.length > 0 ? Math.max(...data.map(i => i.id)) + 1 : 1;
         const newItem = { ...item, id: newId };
         data.push(newItem);
+        saveToLocalStorage(); // Sauvegarder après création
         return newItem;
     },
     update(type, id, updatedItem) {
@@ -105,6 +140,7 @@ const dataManager = {
         const index = data.findIndex(item => item.id === id);
         if (index !== -1) {
             data[index] = { ...data[index], ...updatedItem };
+            saveToLocalStorage(); // Sauvegarder après modification
             return data[index];
         }
         return null;
@@ -114,15 +150,22 @@ const dataManager = {
         const index = data.findIndex(item => item.id === id);
         if (index !== -1) {
             data.splice(index, 1);
+            saveToLocalStorage(); // Sauvegarder après suppression
             return true;
         }
         return false;
     },
     clearAll(type) {
         dataStore[type] = [];
+        saveToLocalStorage(); // Sauvegarder après nettoyage
     },
     count(type) {
         return this.getAll(type).length;
+    },
+    // Fonction pour réinitialiser toutes les données (optionnel)
+    resetToDefault() {
+        dataStore = JSON.parse(JSON.stringify(defaultDataStore));
+        saveToLocalStorage();
     }
 };
 
