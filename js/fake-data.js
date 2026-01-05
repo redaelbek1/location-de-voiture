@@ -91,6 +91,11 @@ const STORAGE_KEY = 'location_voiture_data';
 // Fonction pour sauvegarder dans localStorage
 function saveToLocalStorage() {
     try {
+        if (!dataStore) {
+            console.error('[DataManager] ERREUR: dataStore n\'est pas défini lors de la sauvegarde!');
+            return false;
+        }
+        
         if (typeof Storage !== 'undefined' && localStorage) {
             const dataToSave = JSON.stringify(dataStore);
             localStorage.setItem(STORAGE_KEY, dataToSave);
@@ -98,9 +103,11 @@ function saveToLocalStorage() {
             const verification = localStorage.getItem(STORAGE_KEY);
             if (!verification || verification !== dataToSave) {
                 console.error('[DataManager] ERREUR: La sauvegarde dans localStorage a échoué!');
+                console.error('[DataManager] Données à sauvegarder:', dataToSave.substring(0, 100) + '...');
+                console.error('[DataManager] Données vérifiées:', verification ? verification.substring(0, 100) + '...' : 'null');
                 return false;
             } else {
-                console.log('[DataManager] Données sauvegardées avec succès dans localStorage');
+                console.log('[DataManager] ✓ Données sauvegardées avec succès dans localStorage');
                 return true;
             }
         } else {
@@ -109,6 +116,7 @@ function saveToLocalStorage() {
         }
     } catch (error) {
         console.error('[DataManager] ERREUR lors de la sauvegarde dans localStorage:', error);
+        console.error('[DataManager] Stack trace:', error.stack);
         // Si le localStorage est plein, essayer de nettoyer ou avertir l'utilisateur
         if (error.name === 'QuotaExceededError') {
             console.error('[DataManager] Le localStorage est plein. Impossible de sauvegarder les données.');
@@ -151,11 +159,13 @@ if (!dataStore) {
     // Si aucune donnée sauvegardée, utiliser les données par défaut
     console.log('[DataManager] Aucune donnée sauvegardée trouvée. Utilisation des données par défaut.');
     dataStore = JSON.parse(JSON.stringify(defaultDataStore));
-    const saved = saveToLocalStorage(); // Sauvegarder les données par défaut
-    if (saved) {
+    // Sauvegarder les données par défaut
+    const dataToSave = JSON.stringify(dataStore);
+    try {
+        localStorage.setItem(STORAGE_KEY, dataToSave);
         console.log('[DataManager] ✓ Données par défaut sauvegardées avec succès.');
-    } else {
-        console.error('[DataManager] ✗ ÉCHEC de la sauvegarde des données par défaut!');
+    } catch (error) {
+        console.error('[DataManager] ✗ ÉCHEC de la sauvegarde des données par défaut!', error);
     }
 } else {
     // S'assurer que toutes les propriétés existent (au cas où la structure change)
@@ -183,6 +193,10 @@ if (!dataStore) {
 // Objet dataManager avec persistance automatique
 const dataManager = {
     getAll(type) {
+        if (!dataStore) {
+            console.error('[DataManager] ERREUR: dataStore n\'est pas défini dans getAll!');
+            return [];
+        }
         if (!dataStore[type]) {
             dataStore[type] = [];
         }
@@ -201,6 +215,7 @@ const dataManager = {
         const newId = data.length > 0 ? Math.max(...data.map(i => i.id)) + 1 : 1;
         const newItem = { ...item, id: newId };
         data.push(newItem);
+        
         // Sauvegarder immédiatement après création
         console.log(`[DataManager] Création d'un nouvel élément de type "${type}" avec ID ${newId}`);
         console.log(`[DataManager] Avant sauvegarde - Total ${type}:`, dataStore[type].length);
@@ -219,12 +234,14 @@ const dataManager = {
         return newItem;
     },
     update(type, id, updatedItem) {
+        if (!dataStore) {
+            console.error('[DataManager] ERREUR: dataStore n\'est pas défini!');
+            return null;
+        }
         const data = this.getAll(type);
         const index = data.findIndex(item => item.id === id);
         if (index !== -1) {
             data[index] = { ...data[index], ...updatedItem };
-            // S'assurer que dataStore est bien mis à jour
-            dataStore[type] = data;
             // Sauvegarder immédiatement après modification
             console.log(`[DataManager] Modification de l'élément ${id} de type "${type}"`);
             const saved = saveToLocalStorage();
@@ -236,12 +253,14 @@ const dataManager = {
         return null;
     },
     delete(type, id) {
+        if (!dataStore) {
+            console.error('[DataManager] ERREUR: dataStore n\'est pas défini!');
+            return false;
+        }
         const data = this.getAll(type);
         const index = data.findIndex(item => item.id === id);
         if (index !== -1) {
             data.splice(index, 1);
-            // S'assurer que dataStore est bien mis à jour
-            dataStore[type] = data;
             // Sauvegarder immédiatement après suppression
             console.log(`[DataManager] Suppression de l'élément ${id} de type "${type}"`);
             const saved = saveToLocalStorage();
